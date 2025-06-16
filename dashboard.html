@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f7fa;
+        }
+        .navbar {
+            background-color: #2979ff;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .chat-box {
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .user-msg {
+            text-align: right;
+            color: #2979ff;
+            margin-bottom: 10px;
+        }
+        .bot-msg {
+            text-align: left;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #2979ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1565c0;
+        }
+        .result-box {
+            background: #eef5ff;
+            padding: 10px;
+            border-left: 5px solid #2979ff;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+        input[type="file"] {
+            border: 1px solid #ccc;
+            padding: 6px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div><strong>Secure Dashboard</strong></div>
+    <a href="/logout"><button>Logout</button></a>
+</div>
+
+<div class="container">
+    <h2>Welcome, {{ user }} 👋</h2>
+    <p>Ask your cybersecurity assistant, paste a URL, or upload a file to scan:</p>
+
+    <div class="chat-box" id="chatBox"></div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Type a message or URL...">
+        <button onclick="startVoice()" title="Speak">🎤</button>
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <div class="input-area">
+        <input type="file" id="fileInput">
+        <button onclick="scanFile()">Scan File</button>
+    </div>
+
+    <div id="fileScanResult" class="result-box"></div>
+</div>
+
+<script>
+    const chatBox = document.getElementById('chatBox');
+    const userInput = document.getElementById('userInput');
+
+    function appendMessage(message, type) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add(type === 'user' ? 'user-msg' : 'bot-msg');
+        msgDiv.textContent = message;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        appendMessage(message, 'user');
+        appendMessage("⏳ Thinking...", 'bot');
+        userInput.value = '';
+
+        const isURL = /^(http|https):\/\/[^ "]+$/.test(message);
+
+        if (isURL) {
+            const res = await fetch('/scan_url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: message })
+            });
+
+            const text = await res.text();
+            removeThinking();
+            appendMessage(text, 'bot');
+        } else {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+
+            const data = await response.json();
+            removeThinking();
+            appendMessage(data.reply, 'bot');
+        }
+    }
+
+    function removeThinking() {
+        const thinkingMsg = chatBox.querySelectorAll('.bot-msg');
+        if (thinkingMsg.length) thinkingMsg[thinkingMsg.length - 1].remove();
+    }
+
+    function startVoice() {
+        if (!('webkitSpeechRecognition' in window)) {
+            alert("Sorry, your browser doesn't support voice recognition.");
+            return;
+        }
+
+        const recognition = new webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.start();
+
+        recognition.onresult = function (event) {
+            const transcript = event.results[0][0].transcript;
+            userInput.value = transcript;
+            sendMessage();
+        };
+
+        recognition.onerror = function (event) {
+            console.error('Voice recognition error:', event.error);
+        };
+    }
+
+    async function scanFile() {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) {
+            alert("Please select a file.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        document.getElementById('fileScanResult').innerText = '⏳ Uploading and scanning...';
+
+        const res = await fetch('/scan_file', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await res.text();
+        document.getElementById('fileScanResult').innerText = result;
+    }
+
+    userInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+
+</body>
+</html>
