@@ -44,3 +44,17 @@ In the rapidly evolving landscape of cybersecurity threats, timely detection and
 
 ## 📁 Folder Structure
 
+cyber-chatbot/
+├── app.py # Main Flask app
+├── chatbot.py # AI response logic
+├── virustotal.py # VirusTotal scanning functions
+├── logger.py # IP & login logger
+├── templates/
+│ ├── index.html # Frontend dashboard
+│ └── login.html
+├── static/
+│ └── style.css
+├── requirements.txt
+└── README.md
+
+
